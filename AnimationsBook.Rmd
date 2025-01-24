@@ -1,0 +1,80 @@
+---
+title: "Animation Notebook"
+author: Randy Yee (pcx5@cdc.gov)
+output: 
+  revealjs::revealjs_presentation:
+    theme: black
+    center: true
+    fig_width: 7
+    fig_height: 6
+---
+
+```{r, include=FALSE}
+options(scipen=10000)
+
+library(tidyverse)
+library(ggplot2)
+library(gganimate)
+library(extrafont)
+library(scales)
+```
+
+```{r, include=FALSE}
+df <- read_delim("C:/Users/pcx5/Desktop/Narrative Tests/MER_Structured_Datasets_Site_IM_FY18-21_20201218_v2_1_Angola.txt", 
+                   "\t", 
+                   escape_double = FALSE,
+                   trim_ws = TRUE,
+                   col_types = cols(.default = col_character(), 
+                                    targets = col_double(),
+                                    qtr1 = col_double(),
+                                    qtr2 = col_double(),
+                                    qtr3 = col_double(),
+                                    qtr4 = col_double(),
+                                    cumulative = col_double()
+                                    ) 
+                   ) %>%
+  pivot_longer(targets:cumulative,
+               names_to = "attribute",
+               values_to = "value") %>%
+  unite("period", 
+        c("fiscal_year", "attribute"),
+        sep = "_", 
+        remove = F)
+```
+
+# Clinical Performance Monitoring
+
+## Clinical Cascade Achievement
+
+```{r, include=FALSE}
+cc <- df %>%
+  filter(indicator %in% c("HTS_TST", "HTS_TST_POS", "TX_CURR", "TX_NEW", "TX_PVLS") & 
+           standardizeddisaggregate %in% c("Total Numerator", "Total Denominator")) %>%
+  filter(attribute %in% c("targets", "cumulative"))%>%
+  unite("labels", indicator, numeratordenom) %>%
+  group_by(labels, fiscal_year, attribute) %>%
+  summarise(value = sum(value, na.rm = T)) %>%
+  ungroup() %>%
+  pivot_wider(names_from = attribute, values_from = value) %>%
+  mutate(Achievement = cumulative/targets) %>%
+  rename(Cumulative = cumulative, Target = targets, `Fiscal Year` = fiscal_year, Indicator = labels)
+```
+
+```{r, echo=FALSE}
+ggplot(cc) +
+  geom_col(aes(y = Cumulative, x = Indicator, fill = Indicator)) +
+  geom_hline(aes(yintercept = Target), colour = "black", size = 1) +
+  theme_bw() +
+  theme(panel.grid.major.y = element_blank(),
+        strip.background = element_blank(),
+        strip.text.x = element_blank(),
+        legend.position = "none") +
+  scale_y_continuous(labels=comma) +
+  #facet_wrap(~Indicator, scales = "free_x", ncol = 1) +
+  transition_states(`Fiscal Year`,
+                    transition_length = 3,
+                    state_length = 20) +
+  labs(subtitle = "Year: {closest_state}")
+```
+
+##
